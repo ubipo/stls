@@ -1,7 +1,6 @@
 from typeguard import typechecked
 from enum import Enum
-import socket
-import threading
+import os, socket, threading, gzip, datetime
 
 import stls
 from stls import LogMessage, Parser, safeSockOp, SafeSockException
@@ -10,18 +9,51 @@ from stls import LogMessage, Parser, safeSockOp, SafeSockException
 class Server:
     """Sel TCP logging server. Used to log Sel messages over TCP."""
 
-    def __init__(self, ip = stls.DEF_IP, port = stls.DEF_PORT, bufferSize = stls.DEF_BUFFER_SIZE):
+    def __init__(self, ip = stls.DEF_IP, port = stls.DEF_PORT, logDir = stls.DEF_LOG_DIR, bufferSize = stls.DEF_BUFFER_SIZE):
         self.addr = (ip, port)
         self.bufferSize = bufferSize
+        self.logDir = logDir
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.parser = Parser()
-        self.logFile = open("stls.log", "a")
+        self.logFileOp = False
+        self.openLogFile()
+    
+    def __del__(self):
+        self.logFile.close()
 
     def init(self):
         self.s.bind(self.addr)
         self.s.listen(5)
         print(f"Listening on {self.addr}")
+
+    def openLogFile(self):
+        while self.logFileOp:
+            pass
+        self.logFileOp = True
+
+        if not self.logFileWritable():
+            if not os.path.exists(f"{self.logDir}"):
+                os.mkdir(f"{self.logDir}")
+
+            self.logFile = open(f"{self.logDir}/stls.log", "a")
+
+        size = os.path.getsize(f"{self.logDir}/stls.log")
+
+        if size > 2**20:
+            print("Creating archive!")
+            self.logFile.close()
+            with open(f"{self.logDir}/stls.log", 'r') as lf:
+                with gzip.open(f"{self.logDir}/stls-{datetime.datetime.today().isoformat()}.log.gz", 'wb') as ar:
+                    ar.write(bytes(lf.read(), "utf-8"))
+
+            open(f"{self.logDir}/stls.log", 'w').close()
+            self.logFile = open(f"{self.logDir}/stls.log", "a")            
+        
+        self.logFileOp = False
+    
+    def logFileWritable(self):
+        return hasattr(self, "logFile") and self.logFile.writable()
 
     def serve(self):
         lSocket, addr = self.s.accept()
@@ -53,7 +85,7 @@ class Server:
             raw = ()
             err = None
             try:
-                raw = safeSockOp(lambda: lSocket.recv(stls.DEF_BUFFER_SIZE))
+                raw = safeSockOp(lambda: lSocket.recv(self.bufferSize))
             except SafeSockException as err:
                 self.logConnMsg(Server.ConnIndicator.INFO, addr, err)
                 break
@@ -149,7 +181,9 @@ class Server:
         @throws ValueError
         """
 
+        self.openLogFile()
         self.logFile.write(logMessage.asString() + "\n")
+        self.logFile.flush()
 
     def __str__(self):
         return f"<Stls [addr: {self.addr}]>"

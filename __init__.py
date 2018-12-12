@@ -1,6 +1,7 @@
 DEF_IP = '127.0.0.1'
 DEF_PORT = 55175
 DEF_BUFFER_SIZE = 1024
+DEF_LOG_DIR = "stls-logs"
 
 DEF_ESC = '+'
 DEF_SEP = '$'

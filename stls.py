@@ -9,10 +9,10 @@ import stls
 from stls import Server
 
 
-def run(ip = stls.DEF_IP, port = stls.DEF_PORT):
+def run(ip = stls.DEF_IP, port = stls.DEF_PORT, logDir = stls.DEF_LOG_DIR):
     try:
         print("=== stls - Sel TCP Logging Server ===")
-        server = Server(ip, port)
+        server = Server(ip, port, logDir)
         server.init()
         server.serveForever()
     except KeyboardInterrupt:
@@ -26,10 +26,12 @@ def main():
                         help=f"ip of listening socket (default: {stls.DEF_IP})")
     parser.add_argument('-p', '--port', dest='port', type=int, default=stls.DEF_PORT,
                         help=f"port of listening socket (default: {stls.DEF_PORT})")
+    parser.add_argument('-l', '--log-dir', dest='logDir', type=str, default=stls.DEF_LOG_DIR,
+                        help=f"log file directory (default: {stls.DEF_LOG_DIR})")
 
     args = parser.parse_args()
 
-    run(args.ip, args.port)
+    run(args.ip, args.port, args.logDir)
 
 
 if __name__ == "__main__":
